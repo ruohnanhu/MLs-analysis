@@ -1,0 +1,224 @@
+---
+title: "Hu_Ruohnan_MLsAnalysis"
+author: "Ruohnan Hu"
+date: "1/17/2020"
+output:
+  word_document: default
+  html_document: default
+---
+For the mtcars data set try the following machine learning algorithms.
+Use a training data set of 27 examples and a test data set of 5 examples.
+Build classification models for the vs variable. Pick a model scoring function and determine which model is the best.
+
+Conclusion: 
+Glm worked better here. The rest not so with such small size sample.
+
+```{r warning=FALSE}
+library(tidyverse)
+library(tictoc)
+library(ggmap)
+library(skimr)
+library(lubridate)
+library(forcats)
+library(kableExtra)
+```
+
+
+```{r}
+set.seed(2644)
+dt <- mtcars
+n <- nrow(dt)
+test_idx <- sample.int(n, size = 5)
+train <- dt[-test_idx, ]
+nrow(train)
+
+test <- dt[test_idx, ]
+nrow(test)
+```
+1. Null model
+```{r}
+prop.table(table(dt$vs))
+```
+KNN
+```{r}
+library(class)
+# distance metric only works with quantitative variables 
+vs_knn <- knn(train, test = train, cl = train$vs, k = 5)
+confusion <- train %>%
+  tally(vs_knn == vs)
+confusion
+
+sum(diag(confusion)) / nrow(train)
+```
+
+Naive Bayes
+Pr(y|x) = Pr(xy) / Pr(x) = Pr(x|y)*Pr(y) / Pr(x)
+```{r}
+library(e1071)
+form <- as.formula("vs ~ mpg+cyl+disp+hp+drat+wt+qsec+am+gear+carb")
+mod_nb <- naiveBayes(form, data = train)
+vs_nb <- predict(mod_nb, newdata = train)
+confusion <- train %>%
+  tally(vs_nb == vs)
+confusion
+
+sum(diag(confusion)) / nrow(train)
+```
+
+Random Forest
+```{r}
+library(randomForest)
+
+mod_rf <- randomForest(form, data = train, ntree = 20, mtry = 2) # using na.roughfix to impute/replace NAs with median of each feature vector
+mod_rf
+sum(diag(mod_rf$confusion)) / nrow(train)
+```
+
+Logistic regression
+```{r}
+# fit the logistic regression model
+mod_glm <- glm(form,family=binomial(link='logit'),data=train)
+mod_glm
+
+summary(mod_glm)
+
+anova(mod_glm, test="Chisq")
+
+# check Accuracy
+fitted.results <- predict(mod_glm,newdata=train,type='response')
+fitted.results <- ifelse(fitted.results > 0.5,1,0)
+
+misClasificError <- mean(fitted.results != train$vs)
+print(paste('Accuracy',1-misClasificError))
+```
+
+
+Build a prediction model for the qsec variable. Pick a model scoring function and determine which model is the best. I would suggest using MSE. Note with the size of this dataset this might not work so well, but you will see how to apply each algorithm.
+
+Conclusion: 
+Linear regression worked best here. 
+
+C5.0
+Note: can't seem to predict on a c5o object...it was working before. I removed and re-installed the package but still not working. So have commented out the prediction part here so that the rest of the program can run.
+```{r}
+# require("devtools")
+# install_github("topepo/C5.0")
+library(C50)
+library(Hmisc)
+train$qsec_f <- as.numeric(cut2(train$qsec, g=3))
+train$qsec_f[train$qsec == 1] = "Low"
+train$qsec_f[train$qsec == 2] = "Medium"
+train$qsec_f[train$qsec == 3] = "High"
+train$qsec_f = factor(train$qsec_f,
+                    levels=c("Low", "Medium", "High"))
+
+form <- as.formula("qsec_f ~ mpg + cyl + disp + hp + drat + wt + vs + am + gear + carb")
+mod_c50 <- C5.0(form, data = train, trials = 50)
+summary(mod_c50)
+
+# qsec_c5o <- predict(mod_c50, newdata = train)
+# confusion <- train %>%
+#   tally(qsec_c5o == qsec)
+# confusion
+# 
+# sum(diag(confusion)) / nrow(train)
+```
+
+Random Forest
+```{r}
+library(randomForest)
+form <- as.formula("qsec ~ mpg + cyl + disp + hp + drat + wt + vs + am + gear + carb")
+mod_rf <- randomForest(form, data = train, ntree = 20, mtry = 2) # using na.roughfix to impute/replace NAs with median of each feature vector
+mod_rf
+sum(diag(mod_rf$confusion)) / nrow(train)
+```
+
+Artificial neural networks
+```{r}
+library(nnet)
+mod_nn <- nnet(form, data = train, size = 2) 
+
+qsec_nn <- predict(mod_nn, newdata = train)
+confusion <- train %>%
+  tally(qsec_nn == qsec)
+confusion
+
+sum(diag(confusion)) / nrow(train)
+```
+
+
+Linear Regression
+```{r}
+mod_lm <- lm(form,data=train)
+mod_lm
+anova(mod_lm)
+summary(mod_lm)
+AIC(mod_lm)
+BIC(mod_lm)
+
+# check Accuracy
+fitted.results <- round(predict(mod_lm,newdata=train,type='response'),2)
+
+actuals_preds <- data.frame(cbind(actuals=train$qsec, predicteds=fitted.results))  # make actuals_predicteds dataframe.
+correlation_accuracy <- cor(actuals_preds)  # 95.16%
+correlation_accuracy
+head(actuals_preds)
+```
+
+
+
+EXTRA CREDIT
+Suppose you do not want to pick a target variable, you are interested in exploring and clustering your data into groups.
+
+Use only the numerical variables mpg and qsec and the categorical variable vs.
+
+Learn about Clustering using the MClust package in R. Run the code presented in the A quick tour of mclust on the mtcars dataset. Use only the numerical variables mpg and qsec and the categorical variable vs.
+
+```{r message=FALSE}
+library(car)
+library(mclust)
+library(Hmisc)
+X <- dt <- mtcars[,c('mpg','qsec','vs')]
+
+head(X)
+```
+
+Simple Scatterplot Matrix
+```{r}
+scatterplotMatrix(~qsec+mpg+vs,data=X, smooth = FALSE, ellipse=
+                      "FALSE", main="Simple Scatterplot Matrix")
+```
+
+Check for Bayesian information criterion (BIC) (note: the penalty term is larger in BIC than in AIC)
+```{r}
+BIC <-mclustBIC(X) #in general, we want smaller values
+plot(BIC)
+```
+
+```{r}
+summary(BIC)
+```
+
+```{r}
+mod1 <- Mclust(X, x = BIC)
+summary(mod1, parameters = TRUE)
+```
+```{r}
+plot(mod1, what = 'classification')
+```
+
+```{r}
+table(mod1$classification)
+
+par(mfrow = c(2,2))
+plot(mod1, what = "uncertainty", dimens = c(2,1), main = "")
+plot(mod1, what = "uncertainty", dimens = c(3,1), main = "")
+plot(mod1, what = "uncertainty", dimens = c(2,3), main = "")
+par(mfrow = c(1,1))
+```
+```{r}
+ICL <- mclustICL(X)
+summary(ICL)
+
+plot(ICL)
+```
