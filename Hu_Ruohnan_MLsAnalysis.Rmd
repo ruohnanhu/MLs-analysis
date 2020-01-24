@@ -1,11 +1,14 @@
----
-title: "Hu_Ruohnan_MLsAnalysis"
-author: "Ruohnan Hu"
-date: "1/17/2020"
-output:
-  word_document: default
-  html_document: default
----
+``` yaml
+  ---
+  title: "Hu_Ruohnan_MLsAnalysis"
+  author: "Ruohnan Hu"
+  date: "1/17/2020"
+  output:
+    word_document: default
+    html_document: default
+      keep_md: true
+  ---
+```
 For the mtcars data set try the following machine learning algorithms.
 Use a training data set of 27 examples and a test data set of 5 examples.
 Build classification models for the vs variable. Pick a model scoring function and determine which model is the best.
@@ -167,7 +170,7 @@ head(actuals_preds)
 
 
 
-EXTRA CREDIT
+EXTRA
 Suppose you do not want to pick a target variable, you are interested in exploring and clustering your data into groups.
 
 Use only the numerical variables mpg and qsec and the categorical variable vs.
